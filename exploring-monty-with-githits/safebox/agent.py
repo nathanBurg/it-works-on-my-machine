@@ -31,14 +31,17 @@ external functions: read_file(path), write_file(path, content), list_files(path)
 get_env(name). These are not pydantic-ai tools. Do not try to call them directly as
 agent tools. You must return only the structured AgentCode output requested by the host.
 Put helper calls only inside the code string. Return code that calls them inside Monty.
+When calling any helper, always make the helper result the final expression.
 For example:
 
 files = list_files("scratch")
 files
 
-result = write_file("scratch/README.md", "Hello from Safebox.")
+content = "# Demo README\\n\\nHello from Safebox.\\n"
+result = write_file("scratch/README.md", content)
 result
 
+Do not write unterminated multiline strings.
 Network access is unavailable in Phase 1. Do not try to use sockets, requests, urllib,
 shell commands, subprocess, or general HTTP fetches.
 Make the final expression the value that should be returned to the user.
@@ -64,8 +67,9 @@ class SafeboxAgent:
         last_code = ""
         last_explanation = ""
         last_execution: ExecutionResult | None = None
-        for attempt in range(1, max_retries + 2):
-            self.log_step("Asking model to write Monty-compatible Python")
+        total_attempts = max_retries + 1
+        for attempt in range(1, total_attempts + 1):
+            self.log_step(f"Asking model to write Monty-compatible Python (attempt {attempt}/{total_attempts})")
             generated = self._generate_code(prompt)
             last_code = generated.code
             last_explanation = generated.explanation
@@ -74,14 +78,21 @@ class SafeboxAgent:
             if last_execution.ok:
                 self.log_step("Execution complete")
                 return AgentTurnResult(last_explanation, last_code, last_execution, attempt)
-            self.log_step("Generated code failed; asking model to rewrite")
+            if attempt == total_attempts:
+                break
+            self.log_step(f"Generated code failed; asking model to rewrite (attempt {attempt + 1}/{total_attempts})")
             prompt = (
-                f"The previous code failed inside Monty with this error:\n{last_execution.error}\n"
-                "Rewrite it to satisfy the original request while staying inside Monty's supported subset.\n"
-                f"Original request: {user_message}"
+                "The previous code failed inside Monty.\n\n"
+                f"Error:\n{last_execution.error}\n\n"
+                f"Failed code:\n```python\n{generated.code}\n```\n\n"
+                "Rewrite the code. Return only structured AgentCode. "
+                "Keep helper results as the final expression. "
+                "If the failed code used a helper response incorrectly, remember helpers return gate dictionaries. "
+                "Stay inside Monty's supported subset.\n"
+                f"Original request:\n{user_message}"
             )
         assert last_execution is not None
-        return AgentTurnResult(last_explanation, last_code, last_execution, max_retries + 1)
+        return AgentTurnResult(last_explanation, last_code, last_execution, total_attempts)
 
     def _generate_code(self, prompt: str) -> AgentCode:
         try:

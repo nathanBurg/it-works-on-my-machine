@@ -63,11 +63,11 @@ def main(argv: list[str] | None = None) -> int:
         if result.execution.stderr:
             print(result.execution.stderr, end="")
         if result.execution.ok:
-            rendered = render_output(result.execution.output, had_stdout=bool(result.execution.stdout))
+            rendered = render_execution_result(result.execution.output, result.execution.audit, had_stdout=bool(result.execution.stdout))
             if rendered:
                 print(rendered)
         else:
-            print(f"Execution failed: {result.execution.error}")
+            print(render_execution_failure(result))
 
 
 def print_policy_summary(config: SafeboxConfig) -> None:
@@ -106,6 +106,30 @@ def render_output(output: Any, *, had_stdout: bool = False) -> str | None:
     if had_stdout:
         return f"result: {output}"
     return f"result: {output}"
+
+
+def render_execution_result(output: Any, audit, *, had_stdout: bool = False) -> str | None:
+    rendered = render_output(output, had_stdout=had_stdout)
+    if rendered is not None:
+        return rendered
+    return render_completion_from_audit(audit)
+
+
+def render_completion_from_audit(audit) -> str | None:
+    if not audit:
+        return None
+    last = audit[-1]
+    if last.decision != "ALLOW":
+        return None
+    return f"result: {last.helper} completed; see gate log above"
+
+
+def render_execution_failure(result) -> str:
+    return (
+        f"Execution failed after {result.attempts} attempts: {result.execution.error}\n"
+        "Generated code:\n"
+        f"```python\n{result.code}\n```"
+    )
 
 
 def render_stdout(stdout: str, *, output: Any) -> str | None:

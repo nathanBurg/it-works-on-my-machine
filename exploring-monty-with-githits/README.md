@@ -2,6 +2,32 @@
 
 Safebox is a local CLI demo for safely executing model-written Python with Monty. Phase 1 focuses on the safety boundary: filesystem and environment access start at zero and open only through local TOML policy.
 
+## Smoke Tests
+
+Run these from the `exploring-monty-with-githits/` directory. If your prompt already shows that directory, do not `cd exploring-monty-with-githits` again.
+
+Passing checks:
+
+```bash
+uv run pytest
+uv run safebox --config configs/deny-all.toml < /dev/null
+uv run safebox --config configs/read-scratch.toml < /dev/null
+uv run safebox --config configs/write-scratch.toml < /dev/null
+DEMO_TOKEN=hello-demo uv run safebox --config configs/env-demo.toml < /dev/null
+uv run safebox-2 --config configs/phase2-deny-all.toml < /dev/null
+uv run safebox-2 --config configs/phase2-githits.toml < /dev/null
+```
+
+Expected failure checks:
+
+```bash
+uv run safebox --config configs/invalid-network.toml
+uv run safebox --config configs/invalid-githits.toml
+uv run safebox-2 --config configs/phase2-invalid-network.toml
+```
+
+The invalid-config checks should fail before the session starts with clear policy errors.
+
 ## Install
 
 Requires Python 3.11+.
@@ -92,12 +118,22 @@ Run GitHits-enabled Phase 2 behavior:
 uv run safebox-2 --config configs/phase2-githits.toml
 ```
 
-Try:
+Try GitHits allow behavior:
 
 ```text
 Use GitHits to search for how pydantic-monty runs code. Target pypi:pydantic-monty and summarize what you find.
+```
+
+Try general network deny behavior:
+
+```text
 Fetch https://example.com.
-Write the GitHits summary into scratch/githits-summary.md.
+```
+
+Try GitHits plus file write behavior:
+
+```text
+Use GitHits to search for how pydantic-monty runs code. Write the summary into scratch/githits-summary.md.
 ```
 
 Expected behavior:
@@ -105,6 +141,22 @@ Expected behavior:
 - GitHits calls are visible as `[gate] ALLOW githits_search ...` or `[gate] ALLOW githits_example ...`.
 - General network attempts are visible as `[gate] DENY fetch_url ...`.
 - File writes still go through `write_file` and remain scoped to `scratch`.
+
+Expected gate examples:
+
+```text
+[gate] ALLOW githits_search ...
+[gate] DENY fetch_url https://example.com - general network access is disabled
+[gate] ALLOW write_file .../scratch/githits-summary.md - path is allowlisted for write
+```
+
+Generated demo files can be removed before committing unless you intentionally want to keep them:
+
+```bash
+rm -f scratch/README.md scratch/githits-summary.md
+```
+
+Keep `scratch/notes.txt`; it is the committed seed file.
 
 Show invalid non-GitHits network config failing at startup:
 
@@ -160,8 +212,41 @@ Create a README.md file in scratch with a short hello-world demo description.
 Create a README.md file in the project root.
 ```
 
-The scratch write should be allowed. The project-root write should be refused.
+The scratch write should be allowed. It may show one failed generation followed by a successful rewrite, especially with local models. The project-root write should be refused.
 Expected gate labels are `write_file` for write attempts and `list_files` for directory listing.
+
+Expected successful scratch write:
+
+```text
+[gate] ALLOW write_file .../scratch/README.md - path is allowlisted for write
+result: .../scratch/README.md
+```
+
+Expected refused project-root write:
+
+```text
+[gate] DENY write_file .../README.md - path is not allowlisted for write
+refused: path is not allowlisted for write: .../README.md
+```
+
+Generated code retry demo:
+
+```text
+Asking model to write Monty-compatible Python (attempt 1/3)
+Generated code failed; asking model to rewrite (attempt 2/3)
+Asking model to write Monty-compatible Python (attempt 2/3)
+Execution complete
+```
+
+If all retries fail, Safebox prints the final error and the generated code so the failure is still narratable:
+
+````text
+Execution failed after 3 attempts: ...
+Generated code:
+```python
+...
+```
+````
 
 Show exact-name env access:
 

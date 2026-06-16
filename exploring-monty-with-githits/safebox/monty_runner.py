@@ -27,6 +27,7 @@ class MontyRunner:
         self.extra_audit_sources = extra_audit_sources or []
 
     def run(self, code: str) -> ExecutionResult:
+        self._clear_extra_audit_sources()
         gates = GateSet(self.config, cwd=self.cwd)
         streams: list[tuple[str, str]] = []
 
@@ -69,6 +70,12 @@ class MontyRunner:
         for source in self.extra_audit_sources:
             audit.extend(source.audit)
         return audit
+
+    def _clear_extra_audit_sources(self) -> None:
+        for source in self.extra_audit_sources:
+            clear_audit = getattr(source, "clear_audit", None)
+            if clear_audit is not None:
+                clear_audit()
 
 
 def _join_stream(streams: list[tuple[str, str]], stream_name: str) -> str:

@@ -23,6 +23,15 @@ def test_fetch_url_always_denies():
     assert helpers.audit[-1].decision == "DENY"
 
 
+def test_clear_audit_removes_previous_turn_records():
+    helpers = GitHitsHelperSet(enabled=True)
+    helpers.fetch_url("https://example.com")
+
+    helpers.clear_audit()
+
+    assert helpers.audit == []
+
+
 def test_githits_search_builds_expected_argv(monkeypatch):
     calls = []
 

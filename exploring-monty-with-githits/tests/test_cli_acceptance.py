@@ -1,7 +1,16 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import safebox.cli as cli
-from safebox.cli import main, print_policy_summary, render_output, render_stdout
+from safebox.cli import (
+    main,
+    print_policy_summary,
+    render_completion_from_audit,
+    render_execution_failure,
+    render_execution_result,
+    render_output,
+    render_stdout,
+)
 from safebox.config import SafeboxConfig, load_config
 from safebox.gates import AuditRecord
 
@@ -97,6 +106,7 @@ def test_step_logs_are_printed_for_successful_turn(monkeypatch, capsys):
     assert "Running generated code in Monty" in out
     assert "Returning result" in out
     assert "result: 391" in out
+    assert "Generated code:" not in out
 
 
 def test_gate_audit_uses_new_helper_name_in_cli(monkeypatch, capsys):
@@ -128,6 +138,75 @@ def test_gate_audit_uses_new_helper_name_in_cli(monkeypatch, capsys):
     assert "Host gate call requested: list_files" in out
     assert "[gate] ALLOW list_files /tmp/scratch - path is allowlisted for read" in out
     assert "result: ['notes.txt']" in out
+
+
+def test_successful_gate_with_no_output_gets_completion_message():
+    audit = [AuditRecord("write_file", "ALLOW", "/tmp/scratch/README.md", "path is allowlisted for write")]
+
+    assert render_execution_result(None, audit) == "result: write_file completed; see gate log above"
+
+
+def test_phase2_successful_gate_with_no_output_gets_completion_message():
+    audit = [AuditRecord("githits_search", "ALLOW", "pypi:pydantic-monty", "GitHits helper is enabled")]
+
+    assert render_execution_result(None, audit) == "result: githits_search completed; see gate log above"
+
+
+def test_denied_gate_does_not_get_completion_message():
+    audit = [AuditRecord("write_file", "DENY", "/tmp/README.md", "path is not allowlisted for write")]
+
+    assert render_completion_from_audit(audit) is None
+
+
+def test_no_audit_no_output_still_renders_nothing():
+    assert render_execution_result(None, []) is None
+
+
+def test_execution_failure_renders_attempt_count_and_code():
+    result = SimpleNamespace(
+        attempts=3,
+        code='write_file("scratch/README.md", "# Demo',
+        execution=SimpleNamespace(error="missing closing quote in string literal"),
+    )
+
+    rendered = render_execution_failure(result)
+
+    assert "Execution failed after 3 attempts: missing closing quote in string literal" in rendered
+    assert "Generated code:" in rendered
+    assert '```python\nwrite_file("scratch/README.md", "# Demo\n```' in rendered
+
+
+def test_phase1_cli_prints_generated_code_on_final_execution_failure(monkeypatch, capsys):
+    class Execution:
+        audit = []
+        stdout = ""
+        stderr = ""
+        ok = False
+        output = None
+        error = "missing closing quote in string literal"
+
+    class Result:
+        execution = Execution()
+        attempts = 3
+        code = 'write_file("scratch/README.md", "# Demo'
+
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_turn(self, _message):
+            return Result()
+
+    inputs = iter(["Create a README.md file in scratch.", "exit"])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr(cli, "SafeboxAgent", FakeAgent)
+
+    assert main([]) == 0
+
+    out = capsys.readouterr().out
+    assert "Execution failed after 3 attempts: missing closing quote in string literal" in out
+    assert "Generated code:" in out
+    assert 'write_file("scratch/README.md", "# Demo' in out
 
 
 def test_ollama_model_builder_does_not_require_env(monkeypatch):

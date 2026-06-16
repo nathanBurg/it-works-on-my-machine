@@ -16,6 +16,9 @@ class GitHitsHelperSet:
     def __post_init__(self) -> None:
         self.audit: list[AuditRecord] = []
 
+    def clear_audit(self) -> None:
+        self.audit.clear()
+
     def external_functions(self) -> dict[str, Any]:
         functions = {"fetch_url": self.fetch_url}
         if self.enabled:

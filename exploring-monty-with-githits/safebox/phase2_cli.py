@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from .agent import SYSTEM_PROMPT, SafeboxAgent
-from .cli import StepLogger, render_output, render_stdout
+from .cli import StepLogger, render_execution_failure, render_execution_result, render_stdout
 from .config import ConfigError
 from .githits_helpers import GitHitsHelperSet
 from .monty_runner import MontyRunner
@@ -20,6 +20,27 @@ githits_example(query, lang=None)
 fetch_url(url) exists only to demonstrate refusal of general network access.
 Do not call these as pydantic-ai tools. Put helper calls only inside the code string.
 Network access is GitHits-only. General network fetches must use fetch_url(url), which will be refused.
+githits_search and githits_example return {{"ok": True, "value": "...json text..."}} on success.
+They return {{"ok": False, "error": "..."}} on refusal or failure.
+Always check response["ok"] before reading response["value"]. The value is JSON text,
+so import json and use json.loads(response["value"]) before reading results. Do not treat the helper
+response itself as a list.
+For example:
+
+import json
+
+response = githits_search("pydantic-monty run code", "pypi:pydantic-monty")
+if not response["ok"]:
+    result = response
+else:
+    data = json.loads(response["value"])
+    results = data.get("results", [])
+    summary = "No GitHits results found."
+    if results:
+        first = results[0]
+        summary = first.get("summary", first.get("title", "No summary found."))
+    result = write_file("scratch/githits-summary.md", summary)
+result
 """.strip()
 
 
@@ -87,11 +108,15 @@ def run_loop(agent: SafeboxAgent, logger: StepLogger) -> int:
         if result.execution.stderr:
             print(result.execution.stderr, end="")
         if result.execution.ok:
-            rendered = render_output(result.execution.output, had_stdout=bool(result.execution.stdout))
+            rendered = render_execution_result(
+                result.execution.output,
+                result.execution.audit,
+                had_stdout=bool(result.execution.stdout),
+            )
             if rendered:
                 print(rendered)
         else:
-            print(f"Execution failed: {result.execution.error}")
+            print(render_execution_failure(result))
 
 
 def print_policy_summary(config: SafeboxPhase2Config) -> None:
