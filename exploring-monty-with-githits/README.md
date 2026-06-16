@@ -151,10 +151,10 @@ Expected gate examples:
 [gate] ALLOW write_file .../scratch/githits-summary.md - path is allowlisted for write
 ```
 
-Generated demo files can be removed before committing unless you intentionally want to keep them:
+Clean up after Phase 2:
 
 ```bash
-rm -f scratch/README.md scratch/githits-summary.md
+rm -f scratch/githits-search-summary.md scratch/githits-summary.md
 ```
 
 Keep `scratch/notes.txt`; it is the committed seed file.
@@ -211,7 +211,7 @@ Expected denial behavior:
 refused: approval denied
 ```
 
-Generated Phase 3 state can be removed before committing unless you intentionally want to keep it:
+Clean up after Phase 3:
 
 ```bash
 rm -rf .safebox
@@ -287,6 +287,12 @@ Expected refused project-root write:
 ```text
 [gate] DENY write_file .../README.md - path is not allowlisted for write
 refused: path is not allowlisted for write: .../README.md
+```
+
+Clean up after the scratch write demo:
+
+```bash
+rm -f scratch/README.md
 ```
 
 Generated code retry demo:
