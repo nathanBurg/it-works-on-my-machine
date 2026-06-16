@@ -144,8 +144,14 @@ def render_stdout(stdout: str, *, output: Any) -> str | None:
 
 def _parse_stringified_gate_result(output: str) -> dict[str, Any] | None:
     stripped = output.strip()
-    if not stripped.startswith("{") or "'ok'" not in stripped and '"ok"' not in stripped:
+    if "'ok'" not in stripped and '"ok"' not in stripped:
         return None
+    if not stripped.startswith("{"):
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        stripped = stripped[start : end + 1]
     try:
         parsed = ast.literal_eval(stripped)
     except (SyntaxError, ValueError):

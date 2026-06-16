@@ -17,8 +17,10 @@ def test_system_prompt_uses_unambiguous_helper_names():
     assert "code string" in SYSTEM_PROMPT
     assert "always make the helper result the final expression" in SYSTEM_PROMPT
     assert "result = write_file" in SYSTEM_PROMPT
-    assert 'content = "# Demo README\\n\\nHello from Safebox.\\n"' in SYSTEM_PROMPT
-    assert "Do not write unterminated multiline strings." in SYSTEM_PROMPT
+    assert '"\\n".join(lines) + "\\n"' in SYSTEM_PROMPT
+    assert "Never put literal line breaks inside quoted strings" in SYSTEM_PROMPT
+    assert 'If the user says "in scratch"' in SYSTEM_PROMPT
+    assert '"scratch/README.md"' in SYSTEM_PROMPT
 
 
 def test_default_ollama_uses_native_output():
@@ -83,7 +85,7 @@ def test_tool_call_generation_error_gets_corrective_retry(monkeypatch):
 
     class FakeRunner:
         def run(self, _code: str):
-            return ExecutionResult(ok=True, output=391, stdout="", stderr="", error=None, audit=[])
+            return ExecutionResult(ok=True, output=391, stdout="", stderr="", error=None, audit=[SimpleNamespace(helper="write_file")])
 
     agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner(), log_step=logs.append)
     result = agent.run_turn("Create a README.md file in scratch.")
@@ -129,7 +131,14 @@ def test_failed_code_is_included_in_retry_prompt(monkeypatch):
                     error="missing closing quote in string literal",
                     audit=[],
                 )
-            return ExecutionResult(ok=True, output="scratch/README.md", stdout="", stderr="", error=None, audit=[])
+            return ExecutionResult(
+                ok=True,
+                output="scratch/README.md",
+                stdout="",
+                stderr="",
+                error=None,
+                audit=[SimpleNamespace(helper="write_file")],
+            )
 
     logs: list[str] = []
     agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner(), log_step=logs.append)
@@ -144,6 +153,12 @@ def test_failed_code_is_included_in_retry_prompt(monkeypatch):
     assert "Return only structured AgentCode" in prompts[1]
     assert "Keep helper results as the final expression" in prompts[1]
     assert "helpers return gate dictionaries" in prompts[1]
+    assert "missing closing quote" in prompts[1]
+    assert "join([...])" in prompts[1]
+    assert "escaped" in prompts[1]
+    assert "Preserve the requested path" in prompts[1]
+    assert "scratch/<filename>" in prompts[1]
+    assert "call the matching host helper" in prompts[1]
     assert "Asking model to write Monty-compatible Python (attempt 1/3)" in logs
     assert "Generated code failed; asking model to rewrite (attempt 2/3)" in logs
     assert "Asking model to write Monty-compatible Python (attempt 2/3)" in logs
@@ -171,3 +186,70 @@ def test_final_failed_attempt_does_not_log_another_retry(monkeypatch):
     assert result.attempts == 2
     assert logs.count("Generated code failed; asking model to rewrite (attempt 2/2)") == 1
     assert not any("attempt 3/2" in log for log in logs)
+
+
+def test_file_request_retries_when_code_calls_no_helper(monkeypatch):
+    prompts: list[str] = []
+    generated_codes = iter(
+        [
+            AgentCode(code='content = "hello"\ncontent', explanation="forgot helper"),
+            AgentCode(code='result = write_file("scratch/README.md", "hello")\nresult', explanation="uses helper"),
+        ]
+    )
+
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_sync(self, prompt: str):
+            prompts.append(prompt)
+            return SimpleNamespace(output=next(generated_codes))
+
+    monkeypatch.setattr("pydantic_ai.Agent", FakeAgent)
+
+    class FakeRunner:
+        def __init__(self):
+            self.calls = 0
+
+        def run(self, _code: str):
+            self.calls += 1
+            if self.calls == 1:
+                return ExecutionResult(ok=True, output="hello", stdout="", stderr="", error=None, audit=[])
+            return ExecutionResult(
+                ok=True,
+                output={"ok": True, "value": "scratch/README.md"},
+                stdout="",
+                stderr="",
+                error=None,
+                audit=[SimpleNamespace(helper="write_file")],
+            )
+
+    logs: list[str] = []
+    agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner(), log_step=logs.append)
+
+    result = agent.run_turn("Create a README.md file in scratch.")
+
+    assert result.execution.output == {"ok": True, "value": "scratch/README.md"}
+    assert result.attempts == 2
+    assert "completed without calling the required host helper" in prompts[1]
+    assert "write_file" in prompts[1]
+    assert "Generated code skipped required helper; asking model to rewrite (attempt 2/3)" in logs
+
+
+def test_pure_compute_does_not_require_host_helper(monkeypatch):
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_sync(self, _prompt: str):
+            return SimpleNamespace(output=AgentCode(code="17 * 23", explanation="compute"))
+
+    monkeypatch.setattr("pydantic_ai.Agent", FakeAgent)
+
+    class FakeRunner:
+        def run(self, _code: str):
+            return ExecutionResult(ok=True, output=391, stdout="", stderr="", error=None, audit=[])
+
+    agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner())
+
+    assert agent.run_turn("Compute 17 * 23.").execution.output == 391

@@ -37,11 +37,20 @@ For example:
 files = list_files("scratch")
 files
 
-content = "# Demo README\\n\\nHello from Safebox.\\n"
+lines = [
+    "# Demo README",
+    "",
+    "Hello from Safebox.",
+]
+content = "\\n".join(lines) + "\\n"
 result = write_file("scratch/README.md", content)
 result
 
-Do not write unterminated multiline strings.
+Never put literal line breaks inside quoted strings. For multi-line content, use
+"\\n".join(lines) + "\\n" or escaped "\\n" sequences.
+If the user says "in scratch", write to a path under "scratch/", for example
+"scratch/README.md"; never shorten it to "README.md".
+Use the exact user-requested path when one is provided.
 Network access is unavailable in Phase 1. Do not try to use sockets, requests, urllib,
 shell commands, subprocess, or general HTTP fetches.
 Make the final expression the value that should be returned to the user.
@@ -76,21 +85,27 @@ class SafeboxAgent:
             self.log_step("Running generated code in Monty")
             last_execution = self.runner.run(generated.code)
             if last_execution.ok:
-                self.log_step("Execution complete")
-                return AgentTurnResult(last_explanation, last_code, last_execution, attempt)
+                missing_helper_error = _missing_required_helper_error(user_message, last_execution)
+                if missing_helper_error is None:
+                    self.log_step("Execution complete")
+                    return AgentTurnResult(last_explanation, last_code, last_execution, attempt)
+                last_execution = ExecutionResult(
+                    ok=False,
+                    output=last_execution.output,
+                    stdout=last_execution.stdout,
+                    stderr=last_execution.stderr,
+                    error=missing_helper_error,
+                    audit=last_execution.audit,
+                )
+                if attempt == total_attempts:
+                    break
+                self.log_step(f"Generated code skipped required helper; asking model to rewrite (attempt {attempt + 1}/{total_attempts})")
+                prompt = _retry_prompt(user_message, generated.code, missing_helper_error)
+                continue
             if attempt == total_attempts:
                 break
             self.log_step(f"Generated code failed; asking model to rewrite (attempt {attempt + 1}/{total_attempts})")
-            prompt = (
-                "The previous code failed inside Monty.\n\n"
-                f"Error:\n{last_execution.error}\n\n"
-                f"Failed code:\n```python\n{generated.code}\n```\n\n"
-                "Rewrite the code. Return only structured AgentCode. "
-                "Keep helper results as the final expression. "
-                "If the failed code used a helper response incorrectly, remember helpers return gate dictionaries. "
-                "Stay inside Monty's supported subset.\n"
-                f"Original request:\n{user_message}"
-            )
+            prompt = _retry_prompt(user_message, generated.code, last_execution.error)
         assert last_execution is not None
         return AgentTurnResult(last_explanation, last_code, last_execution, total_attempts)
 
@@ -121,6 +136,34 @@ class SafeboxAgent:
             message = _friendly_model_error(self.config, exc)
             raise RuntimeError(message) from exc
         return result.output
+
+
+def _retry_prompt(user_message: str, failed_code: str, error: str | None) -> str:
+    return (
+        "The previous code failed inside Monty.\n\n"
+        f"Error:\n{error}\n\n"
+        f"Failed code:\n```python\n{failed_code}\n```\n\n"
+        "Rewrite the code. Return only structured AgentCode. "
+        "Keep helper results as the final expression. "
+        "If the failed code used a helper response incorrectly, remember helpers return gate dictionaries. "
+        "If the error mentions a missing closing quote, rewrite multiline content with \"\\\\n\".join([...]) "
+        "or escaped \"\\\\n\" sequences. "
+        "Preserve the requested path exactly. If the user asked for a file in scratch, use \"scratch/<filename>\". "
+        "For file create/write/read/list or environment requests, call the matching host helper: "
+        "write_file, read_file, list_files, or get_env. Do not just construct a value without calling a helper. "
+        "Stay inside Monty's supported subset.\n"
+        f"Original request:\n{user_message}"
+    )
+
+
+def _missing_required_helper_error(user_message: str, execution: ExecutionResult) -> str | None:
+    if execution.audit:
+        return None
+    lowered = user_message.lower()
+    helper_terms = ("create", "write", "read", "list", "file", "scratch", "env", "environment")
+    if not any(term in lowered for term in helper_terms):
+        return None
+    return "Generated code completed without calling the required host helper"
 
 
 def _build_model(config: SafeboxConfig):

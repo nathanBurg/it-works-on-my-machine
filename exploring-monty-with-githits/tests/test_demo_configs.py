@@ -39,6 +39,15 @@ def test_env_demo_config_loads_demo_token_only():
     assert "OPENAI_API_KEY" in config.provider_secret_names()
 
 
+def test_phase3_snapshot_config_loads_and_grants_only_scratch():
+    config = load_config(CONFIGS / "phase3-snapshot.toml", cwd=PROJECT_ROOT)
+
+    assert config.filesystem.allow_read == [SCRATCH.resolve()]
+    assert config.filesystem.allow_write == [SCRATCH.resolve()]
+    assert config.network.enabled is False
+    assert config.helpers.githits is False
+
+
 def test_invalid_network_config_fails():
     with pytest.raises(ConfigError, match="Phase 2 only"):
         load_config(CONFIGS / "invalid-network.toml", cwd=PROJECT_ROOT)

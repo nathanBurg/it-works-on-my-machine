@@ -25,7 +25,31 @@ They return {{"ok": False, "error": "..."}} on refusal or failure.
 Always check response["ok"] before reading response["value"]. The value is JSON text,
 so import json and use json.loads(response["value"]) before reading results. Do not treat the helper
 response itself as a list.
-For example:
+If any helper returns {{"ok": False, "error": "..."}}, make that helper response the final result.
+Do not wrap refusal dictionaries in prose strings.
+If the user mentions pydantic-monty and does not provide a target, use "pypi:pydantic-monty".
+Never call githits_search with an empty target.
+Only call write_file if the user explicitly asks to write, save, create, or store a file.
+If the user only asks to summarize, return a summary string as the final expression.
+
+Summarize-only example:
+
+import json
+
+response = githits_search("pydantic-monty run code", "pypi:pydantic-monty")
+if not response["ok"]:
+    result = response
+else:
+    data = json.loads(response["value"])
+    results = data.get("results", [])
+    summary = "No GitHits results found."
+    if results:
+        first = results[0]
+        summary = first.get("summary", first.get("title", "No summary found."))
+    result = summary
+result
+
+Write-summary example:
 
 import json
 

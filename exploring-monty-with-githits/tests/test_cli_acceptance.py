@@ -235,6 +235,12 @@ def test_render_output_formats_stringified_gate_refusal():
     assert render_output(output) == "refused: path is not allowlisted"
 
 
+def test_render_output_formats_embedded_stringified_gate_refusal():
+    output = "Error searching GitHits: {'ok': False, 'error': 'Refused: target is required'}"
+
+    assert render_output(output) == "refused: target is required"
+
+
 def test_render_output_formats_gate_success():
     assert render_output({"ok": True, "value": "hello"}) == "result: hello"
 
@@ -247,6 +253,10 @@ def test_render_output_formats_stringified_gate_success():
 
 def test_render_output_formats_normal_value():
     assert render_output(8760) == "result: 8760"
+
+
+def test_render_output_preserves_normal_summary_string():
+    assert render_output("ordinary summary") == "result: ordinary summary"
 
 
 def test_render_stdout_formats_printed_gate_result_when_output_is_none():

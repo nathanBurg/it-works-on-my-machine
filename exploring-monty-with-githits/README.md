@@ -16,6 +16,7 @@ uv run safebox --config configs/write-scratch.toml < /dev/null
 DEMO_TOKEN=hello-demo uv run safebox --config configs/env-demo.toml < /dev/null
 uv run safebox-2 --config configs/phase2-deny-all.toml < /dev/null
 uv run safebox-2 --config configs/phase2-githits.toml < /dev/null
+uv run safebox-3 --config configs/phase3-snapshot.toml < /dev/null
 ```
 
 Expected failure checks:
@@ -157,6 +158,65 @@ rm -f scratch/README.md scratch/githits-summary.md
 ```
 
 Keep `scratch/notes.txt`; it is the committed seed file.
+
+## Phase 3: Snapshot And Resume Demo
+
+Phase 3 is launched with `safebox-3`. It uses Monty's iterative `start()` / `resume()` flow and `FunctionSnapshot.dump()` / `load_snapshot()` so a paused program can be resumed in a later process.
+
+Run the Phase 3 session:
+
+```bash
+uv run safebox-3 --config configs/phase3-snapshot.toml
+```
+
+Try:
+
+```text
+Create scratch/phase3-demo.md, but pause for approval before writing it.
+```
+
+Expected first run behavior:
+
+```text
+[gate] ALLOW request_approval Write scratch/phase3-demo.md - human approval required
+result: snapshot saved: .../.safebox/latest.snapshot
+next: exit this session, then run:
+uv run safebox-3 resume --approve --config configs/phase3-snapshot.toml
+```
+
+Do not type `proceed` inside the active `safebox-3` session. Exit or press Ctrl-C, then approve the pending action from a new run:
+
+```bash
+uv run safebox-3 resume --approve --config configs/phase3-snapshot.toml
+```
+
+Expected approval behavior:
+
+```text
+[gate] ALLOW request_approval Write scratch/phase3-demo.md - human approved pending action
+[gate] ALLOW write_file .../scratch/phase3-demo.md - path is allowlisted for write
+result: .../scratch/phase3-demo.md
+```
+
+To test denial, recreate the snapshot with the same prompt and then run:
+
+```bash
+uv run safebox-3 resume --deny --config configs/phase3-snapshot.toml
+```
+
+Expected denial behavior:
+
+```text
+[gate] DENY request_approval Write scratch/phase3-demo.md - human denied pending action
+refused: approval denied
+```
+
+Generated Phase 3 state can be removed before committing unless you intentionally want to keep it:
+
+```bash
+rm -rf .safebox
+rm -f scratch/phase3-demo.md
+```
 
 Show invalid non-GitHits network config failing at startup:
 
