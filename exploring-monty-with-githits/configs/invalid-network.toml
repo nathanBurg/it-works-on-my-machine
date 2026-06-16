@@ -1,0 +1,18 @@
+[model]
+provider = "ollama"
+model = "gemma4:e4b"
+base_url = "http://localhost:11434/v1"
+
+[filesystem]
+allow_read = []
+allow_write = []
+
+[env]
+allow = []
+
+[network]
+enabled = true
+
+[helpers]
+files = true
+githits = false
