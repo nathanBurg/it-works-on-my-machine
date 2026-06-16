@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -160,8 +161,15 @@ def _missing_required_helper_error(user_message: str, execution: ExecutionResult
     if execution.audit:
         return None
     lowered = user_message.lower()
-    helper_terms = ("create", "write", "read", "list", "file", "scratch", "env", "environment")
-    if not any(term in lowered for term in helper_terms):
+    has_host_term = bool(
+        re.search(r"\b(?:file|files|scratch|env|environment|directory|directories|folder|folders)\b", lowered)
+        or re.search(r"\b(?:write_file|read_file|list_files|get_env)\b", lowered)
+    )
+    has_path_like_term = bool(
+        re.search(r"\b[\w.-]+\.(?:md|txt|json|toml|py)\b", lowered)
+        or re.search(r"(?:^|\s)(?:\.?\.?/|/|[a-z_.-]*[a-z_][\w.-]*/)[\w./-]+", lowered)
+    )
+    if not has_host_term and not has_path_like_term:
         return None
     return "Generated code completed without calling the required host helper"
 

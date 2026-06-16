@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from safebox.gates import AuditRecord
 from safebox.config import SafeboxConfig
+from safebox.gates import AuditRecord
+from safebox.githits_helpers import GitHitsHelperSet
 from safebox.monty_runner import MontyRunner
 
 
@@ -124,6 +125,23 @@ def test_extra_audit_sources_are_cleared_per_run(tmp_path: Path):
 
     assert [record.helper for record in first.audit] == ["fetch_url"]
     assert [record.helper for record in second.audit] == ["githits_search"]
+
+
+def test_disabled_githits_search_is_a_gate_denial_not_name_error(tmp_path: Path):
+    helpers = GitHitsHelperSet(enabled=False)
+
+    result = MontyRunner(
+        SafeboxConfig(),
+        cwd=tmp_path,
+        extra_external_functions=helpers.external_functions(),
+        extra_audit_sources=[helpers],
+    ).run('githits_search("run code", "pypi:pydantic-monty")')
+
+    assert result.ok is True
+    assert result.output == {"ok": False, "error": "Refused: GitHits helper is disabled"}
+    assert result.audit[-1].helper == "githits_search"
+    assert result.audit[-1].decision == "DENY"
+    assert result.audit[-1].target == "pypi:pydantic-monty"
 
 
 def test_githits_json_can_be_parsed_and_written_to_scratch(tmp_path: Path):

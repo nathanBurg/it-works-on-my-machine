@@ -88,6 +88,8 @@ We put the exploration to work:
 - Use the GitHits context gathered in Section 1 to have the assistant create a plan for what we're building.
 - Execute the plan, building a small agent that runs code safely inside Monty's sandbox.
 
+The full build is represented by the build plans and `build-plans/demo-build-retrospective.md`; live, we show the loop on one slice and then jump to prebuilt phase demos.
+
 ### Section 3, Where it goes (githits-code)
 
 We close on Monty's session snapshotting:

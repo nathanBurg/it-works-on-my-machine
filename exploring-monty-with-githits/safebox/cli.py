@@ -119,6 +119,8 @@ def render_completion_from_audit(audit) -> str | None:
     if not audit:
         return None
     last = audit[-1]
+    if last.decision == "DENY":
+        return f"refused: {last.reason}"
     if last.decision != "ALLOW":
         return None
     return f"result: {last.helper} completed; see gate log above"

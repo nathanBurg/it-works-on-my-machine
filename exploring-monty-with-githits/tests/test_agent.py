@@ -253,3 +253,110 @@ def test_pure_compute_does_not_require_host_helper(monkeypatch):
     agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner())
 
     assert agent.run_turn("Compute 17 * 23.").execution.output == 391
+
+
+def test_pure_write_prompt_does_not_require_host_helper(monkeypatch):
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_sync(self, _prompt: str):
+            return SimpleNamespace(output=AgentCode(code='"Autumn rain on glass"', explanation="haiku"))
+
+    monkeypatch.setattr("pydantic_ai.Agent", FakeAgent)
+
+    class FakeRunner:
+        def run(self, _code: str):
+            return ExecutionResult(ok=True, output="Autumn rain on glass", stdout="", stderr="", error=None, audit=[])
+
+    agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner())
+
+    result = agent.run_turn("Write a haiku.")
+
+    assert result.execution.output == "Autumn rain on glass"
+    assert result.attempts == 1
+
+
+def test_pure_list_prompt_does_not_require_host_helper(monkeypatch):
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_sync(self, _prompt: str):
+            return SimpleNamespace(output=AgentCode(code="[2, 3, 5, 7, 11]", explanation="primes"))
+
+    monkeypatch.setattr("pydantic_ai.Agent", FakeAgent)
+
+    class FakeRunner:
+        def run(self, _code: str):
+            return ExecutionResult(ok=True, output=[2, 3, 5, 7, 11], stdout="", stderr="", error=None, audit=[])
+
+    agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner())
+
+    result = agent.run_turn("List the first five primes.")
+
+    assert result.execution.output == [2, 3, 5, 7, 11]
+    assert result.attempts == 1
+
+
+def test_arithmetic_slash_does_not_require_host_helper(monkeypatch):
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_sync(self, _prompt: str):
+            return SimpleNamespace(output=AgentCode(code="10 / 2", explanation="divide"))
+
+    monkeypatch.setattr("pydantic_ai.Agent", FakeAgent)
+
+    class FakeRunner:
+        def run(self, _code: str):
+            return ExecutionResult(ok=True, output=5, stdout="", stderr="", error=None, audit=[])
+
+    agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner())
+    result = agent.run_turn("Compute 10/2.")
+
+    assert result.execution.output == 5
+    assert result.attempts == 1
+
+
+def test_profile_substring_does_not_require_host_helper(monkeypatch):
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_sync(self, _prompt: str):
+            return SimpleNamespace(output=AgentCode(code='"A concise profile."', explanation="describe"))
+
+    monkeypatch.setattr("pydantic_ai.Agent", FakeAgent)
+
+    class FakeRunner:
+        def run(self, _code: str):
+            return ExecutionResult(ok=True, output="A concise profile.", stdout="", stderr="", error=None, audit=[])
+
+    agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner())
+    result = agent.run_turn("Describe a profile.")
+
+    assert result.execution.output == "A concise profile."
+    assert result.attempts == 1
+
+
+def test_envelope_substring_does_not_require_host_helper(monkeypatch):
+    class FakeAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run_sync(self, _prompt: str):
+            return SimpleNamespace(output=AgentCode(code='"Fold the envelope neatly."', explanation="instructions"))
+
+    monkeypatch.setattr("pydantic_ai.Agent", FakeAgent)
+
+    class FakeRunner:
+        def run(self, _code: str):
+            return ExecutionResult(ok=True, output="Fold the envelope neatly.", stdout="", stderr="", error=None, audit=[])
+
+    agent = SafeboxAgent(SafeboxConfig(), runner=FakeRunner())
+    result = agent.run_turn("Fold an envelope.")
+
+    assert result.execution.output == "Fold the envelope neatly."
+    assert result.attempts == 1

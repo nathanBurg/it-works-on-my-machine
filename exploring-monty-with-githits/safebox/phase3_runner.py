@@ -10,7 +10,7 @@ from .approval import ApprovalGate
 from .config import SafeboxConfig
 from .gates import AuditRecord, GateSet
 from .monty_runner import ExecutionResult
-from .snapshots import SnapshotMetadata, SnapshotStore
+from .snapshots import SnapshotMetadata, SnapshotStore, policy_fingerprint
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ class Phase3Runner:
         audit = _audit(gates, approval)
         metadata = self.store.save(
             snapshot_bytes=progress.dump(),
-            config_path=self.config.source_path,
+            config=self.config,
             code=code,
             pending_helper=str(_function_name(progress)),
             pending_args=progress.args,
@@ -83,7 +83,15 @@ class Phase3Runner:
 
         try:
             metadata = self.store.load_metadata()
-            snapshot = pydantic_monty.load_snapshot(self.store.load_snapshot_bytes(), print_callback=collect)
+            config_error = _config_mismatch_error(metadata.config_path, self.config.source_path)
+            if config_error is not None:
+                return _execution(False, None, streams, config_error, [])
+            policy_error = _policy_mismatch_error(metadata, self.config)
+            if policy_error is not None:
+                return _execution(False, None, streams, policy_error, [])
+            snapshot_bytes = self.store.load_snapshot_bytes()
+            self.store.clear()
+            snapshot = pydantic_monty.load_snapshot(snapshot_bytes, print_callback=collect)
             if _function_name(snapshot) != "request_approval":
                 return _execution(False, None, streams, f"Snapshot is pending unsupported helper: {_function_name(snapshot)}", [])
             reason = str(metadata.pending_args[0]) if metadata.pending_args else "approval requested"
@@ -123,6 +131,22 @@ def _is_complete(progress: Any) -> bool:
 
 def _function_name(progress: Any) -> str:
     return str(progress.function_name)
+
+
+def _config_mismatch_error(saved_config_path: str | None, active_config_path: Path | None) -> str | None:
+    if saved_config_path is None and active_config_path is None:
+        return None
+    if saved_config_path is None or active_config_path is None:
+        return "Snapshot was created with a different config; resume refused"
+    if Path(saved_config_path).resolve() != active_config_path.resolve():
+        return f"Snapshot was created with a different config: {saved_config_path}"
+    return None
+
+
+def _policy_mismatch_error(metadata: SnapshotMetadata, active_config: SafeboxConfig) -> str | None:
+    if metadata.policy_fingerprint != policy_fingerprint(active_config):
+        return "Snapshot policy no longer matches the active config"
+    return None
 
 
 def _audit(gates: GateSet, approval: ApprovalGate) -> list[AuditRecord]:

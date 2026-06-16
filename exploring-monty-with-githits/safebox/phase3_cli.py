@@ -34,19 +34,19 @@ result
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Safebox Phase 3 snapshot/resume demo")
     subparsers = parser.add_subparsers(dest="command")
-    parser.add_argument("--config", type=Path, help="Path to safebox Phase 3 TOML policy file")
+    parser.add_argument("--config", dest="root_config", type=Path, help="Path to safebox Phase 3 TOML policy file")
 
     resume_parser = subparsers.add_parser("resume", help="Resume the latest Safebox snapshot")
     approval = resume_parser.add_mutually_exclusive_group(required=True)
     approval.add_argument("--approve", action="store_true", help="Approve the pending action")
     approval.add_argument("--deny", action="store_true", help="Deny the pending action")
-    resume_parser.add_argument("--config", type=Path, help="Path to safebox Phase 3 TOML policy file")
+    resume_parser.add_argument("--config", dest="resume_config", type=Path, help="Path to safebox Phase 3 TOML policy file")
 
     args = parser.parse_args(argv)
     logger = StepLogger()
     logger.session("Loading config")
     try:
-        config = load_config(args.config)
+        config = load_config(getattr(args, "resume_config", None) or args.root_config)
     except ConfigError as exc:
         print(exc)
         return 2

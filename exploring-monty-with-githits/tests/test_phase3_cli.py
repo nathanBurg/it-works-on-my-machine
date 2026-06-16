@@ -33,3 +33,43 @@ def test_phase3_resume_without_snapshot_fails_cleanly(tmp_path: Path, monkeypatc
 
     out = capsys.readouterr().out
     assert "No Safebox snapshot" in out
+
+
+def test_phase3_resume_uses_config_before_subcommand(monkeypatch, tmp_path: Path):
+    seen = []
+
+    class FakeRunner:
+        def __init__(self, config):
+            seen.append(config.source_path)
+
+        def resume(self, *, approved: bool):
+            assert approved is True
+            return type("Result", (), {"ok": True, "output": 1, "stdout": "", "stderr": "", "audit": []})()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3_cli, "Phase3Runner", FakeRunner)
+
+    config_path = PROJECT_ROOT / "configs" / "phase3-snapshot.toml"
+    assert phase3_cli.main(["--config", str(config_path), "resume", "--approve"]) == 0
+
+    assert seen == [config_path.resolve()]
+
+
+def test_phase3_resume_uses_config_after_subcommand(monkeypatch, tmp_path: Path):
+    seen = []
+
+    class FakeRunner:
+        def __init__(self, config):
+            seen.append(config.source_path)
+
+        def resume(self, *, approved: bool):
+            assert approved is True
+            return type("Result", (), {"ok": True, "output": 1, "stdout": "", "stderr": "", "audit": []})()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3_cli, "Phase3Runner", FakeRunner)
+
+    config_path = PROJECT_ROOT / "configs" / "phase3-snapshot.toml"
+    assert phase3_cli.main(["resume", "--approve", "--config", str(config_path)]) == 0
+
+    assert seen == [config_path.resolve()]

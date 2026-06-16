@@ -13,6 +13,14 @@ def test_disabled_githits_search_refuses():
     assert helpers.audit[-1].decision == "DENY"
 
 
+def test_disabled_githits_helpers_are_still_registered():
+    helpers = GitHitsHelperSet(enabled=False)
+
+    functions = helpers.external_functions()
+
+    assert set(functions) == {"fetch_url", "githits_search", "githits_example"}
+
+
 def test_fetch_url_always_denies():
     helpers = GitHitsHelperSet(enabled=True)
 

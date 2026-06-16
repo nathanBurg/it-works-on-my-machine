@@ -92,6 +92,45 @@ Paths are resolved relative to the config file. Env vars are exact-name matches.
 - No snapshot/resume. That is Phase 3.
 - No shell helper.
 
+## Phase 1: Safety Boundary Demo
+
+Phase 1 is launched with `safebox`. It shows the core safety boundary: writes inside the allowlisted `scratch` workspace succeed, while writes outside that boundary are refused.
+
+Run narrow read/write access to scratch:
+
+```bash
+uv run safebox --config configs/write-scratch.toml
+```
+
+Try:
+
+```text
+Create a README.md file in scratch with a short hello-world demo description.
+Create a README.md file in the project root.
+```
+
+The scratch write should be allowed. It may show one failed generation followed by a successful rewrite, especially with local models. The project-root write should be refused.
+
+Expected successful scratch write:
+
+```text
+[gate] ALLOW write_file .../scratch/README.md - path is allowlisted for write
+result: .../scratch/README.md
+```
+
+Expected refused project-root write:
+
+```text
+[gate] DENY write_file .../README.md - path is not allowlisted for write
+refused: path is not allowlisted for write: .../README.md
+```
+
+Clean up after Phase 1:
+
+```bash
+rm -f scratch/README.md
+```
+
 ## Phase 2: GitHits Helper Demo
 
 Phase 2 is launched with `safebox-2`. The original `safebox` command remains the Phase 1 demo and keeps the same deny-by-default behavior.
@@ -224,7 +263,7 @@ Show invalid non-GitHits network config failing at startup:
 uv run safebox-2 --config configs/phase2-invalid-network.toml
 ```
 
-## Demo Configs
+## Additional Phase 1 Configs
 
 The `configs/` directory contains ready-to-run policies for showing the boundary changing live.
 
@@ -258,42 +297,6 @@ Create a README.md file in scratch.
 
 Listing should be allowed, writing should be refused.
 The generated Monty code should use `list_files("scratch")` for the allowed list operation and `write_file(...)` for the refused write.
-
-Show narrow read/write access to scratch:
-
-```bash
-uv run safebox --config configs/write-scratch.toml
-```
-
-Try:
-
-```text
-Create a README.md file in scratch with a short hello-world demo description.
-Create a README.md file in the project root.
-```
-
-The scratch write should be allowed. It may show one failed generation followed by a successful rewrite, especially with local models. The project-root write should be refused.
-Expected gate labels are `write_file` for write attempts and `list_files` for directory listing.
-
-Expected successful scratch write:
-
-```text
-[gate] ALLOW write_file .../scratch/README.md - path is allowlisted for write
-result: .../scratch/README.md
-```
-
-Expected refused project-root write:
-
-```text
-[gate] DENY write_file .../README.md - path is not allowlisted for write
-refused: path is not allowlisted for write: .../README.md
-```
-
-Clean up after the scratch write demo:
-
-```bash
-rm -f scratch/README.md
-```
 
 Generated code retry demo:
 

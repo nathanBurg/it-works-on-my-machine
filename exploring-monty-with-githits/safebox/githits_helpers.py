@@ -20,11 +20,11 @@ class GitHitsHelperSet:
         self.audit.clear()
 
     def external_functions(self) -> dict[str, Any]:
-        functions = {"fetch_url": self.fetch_url}
-        if self.enabled:
-            functions["githits_search"] = self.githits_search
-            functions["githits_example"] = self.githits_example
-        return functions
+        return {
+            "fetch_url": self.fetch_url,
+            "githits_search": self.githits_search,
+            "githits_example": self.githits_example,
+        }
 
     def githits_search(self, query: str, target: str, source: str | None = None, limit: int = 5) -> dict[str, Any]:
         if not self.enabled:

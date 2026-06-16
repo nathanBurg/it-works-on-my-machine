@@ -155,7 +155,13 @@ def test_phase2_successful_gate_with_no_output_gets_completion_message():
 def test_denied_gate_does_not_get_completion_message():
     audit = [AuditRecord("write_file", "DENY", "/tmp/README.md", "path is not allowlisted for write")]
 
-    assert render_completion_from_audit(audit) is None
+    assert render_completion_from_audit(audit) == "refused: path is not allowlisted for write"
+
+
+def test_denied_gate_with_no_output_renders_refusal():
+    audit = [AuditRecord("githits_search", "DENY", "pypi:pydantic-monty", "GitHits helper is disabled")]
+
+    assert render_execution_result(None, audit) == "refused: GitHits helper is disabled"
 
 
 def test_no_audit_no_output_still_renders_nothing():
@@ -226,6 +232,12 @@ def test_render_output_suppresses_none():
 def test_render_output_formats_gate_refusal():
     assert render_output({"ok": False, "error": "Refused: path is not allowlisted"}) == (
         "refused: path is not allowlisted"
+    )
+
+
+def test_render_output_formats_disabled_githits_refusal():
+    assert render_output({"ok": False, "error": "Refused: GitHits helper is disabled"}) == (
+        "refused: GitHits helper is disabled"
     )
 
 
