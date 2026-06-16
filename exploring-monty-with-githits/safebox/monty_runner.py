@@ -20,9 +20,11 @@ class ExecutionResult:
 
 
 class MontyRunner:
-    def __init__(self, config: SafeboxConfig, cwd=None):
+    def __init__(self, config: SafeboxConfig, cwd=None, extra_external_functions=None, extra_audit_sources=None):
         self.config = config
         self.cwd = cwd
+        self.extra_external_functions = extra_external_functions or {}
+        self.extra_audit_sources = extra_audit_sources or []
 
     def run(self, code: str) -> ExecutionResult:
         gates = GateSet(self.config, cwd=self.cwd)
@@ -33,7 +35,8 @@ class MontyRunner:
 
         try:
             monty = pydantic_monty.Monty(code)
-            output = monty.run(external_functions=gates.external_functions(), print_callback=collect)
+            external_functions = gates.external_functions() | self.extra_external_functions
+            output = monty.run(external_functions=external_functions, print_callback=collect)
         except pydantic_monty.MontyError as exc:
             return ExecutionResult(
                 ok=False,
@@ -41,7 +44,7 @@ class MontyRunner:
                 stdout=_join_stream(streams, "stdout"),
                 stderr=_join_stream(streams, "stderr"),
                 error=str(exc),
-                audit=list(gates.audit),
+                audit=self._audit(gates),
             )
         except Exception as exc:
             return ExecutionResult(
@@ -50,7 +53,7 @@ class MontyRunner:
                 stdout=_join_stream(streams, "stdout"),
                 stderr=_join_stream(streams, "stderr"),
                 error=f"Host execution error: {exc}",
-                audit=list(gates.audit),
+                audit=self._audit(gates),
             )
         return ExecutionResult(
             ok=True,
@@ -58,8 +61,14 @@ class MontyRunner:
             stdout=_join_stream(streams, "stdout"),
             stderr=_join_stream(streams, "stderr"),
             error=None,
-            audit=list(gates.audit),
+            audit=self._audit(gates),
         )
+
+    def _audit(self, gates: GateSet):
+        audit = list(gates.audit)
+        for source in self.extra_audit_sources:
+            audit.extend(source.audit)
+        return audit
 
 
 def _join_stream(streams: list[tuple[str, str]], stream_name: str) -> str:

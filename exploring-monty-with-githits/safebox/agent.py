@@ -46,10 +46,18 @@ Make the final expression the value that should be returned to the user.
 
 
 class SafeboxAgent:
-    def __init__(self, config: SafeboxConfig, cwd=None, runner: MontyRunner | None = None, log_step=None):
+    def __init__(
+        self,
+        config: SafeboxConfig,
+        cwd=None,
+        runner: MontyRunner | None = None,
+        log_step=None,
+        system_prompt: str = SYSTEM_PROMPT,
+    ):
         self.config = config
         self.runner = runner or MontyRunner(config, cwd=cwd)
         self.log_step = log_step or (lambda _message: None)
+        self.system_prompt = system_prompt
 
     def run_turn(self, user_message: str, max_retries: int = 2) -> AgentTurnResult:
         prompt = user_message
@@ -81,7 +89,7 @@ class SafeboxAgent:
         except ImportError as exc:  # pragma: no cover - exercised in real CLI environments
             raise RuntimeError("pydantic-ai is not installed; install the project dependencies") from exc
 
-        agent = Agent(_build_model(self.config), output_type=_build_output_type(self.config), system_prompt=SYSTEM_PROMPT)
+        agent = Agent(_build_model(self.config), output_type=_build_output_type(self.config), system_prompt=self.system_prompt)
         try:
             result = agent.run_sync(prompt)
         except Exception as exc:

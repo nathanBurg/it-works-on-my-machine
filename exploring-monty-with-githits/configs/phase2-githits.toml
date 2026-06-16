@@ -1,0 +1,19 @@
+[model]
+provider = "ollama"
+model = "gemma4:e4b"
+base_url = "http://localhost:11434/v1"
+
+[filesystem]
+allow_read = ["../scratch"]
+allow_write = ["../scratch"]
+
+[env]
+allow = []
+
+[network]
+enabled = true
+allow = ["githits"]
+
+[helpers]
+files = true
+githits = true

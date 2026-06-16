@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 safebox = "safebox.cli:main"
+safebox-2 = "safebox.phase2_cli:main"
 
 [dependency-groups]
 dev = [

@@ -65,6 +65,53 @@ Paths are resolved relative to the config file. Env vars are exact-name matches.
 - No snapshot/resume. That is Phase 3.
 - No shell helper.
 
+## Phase 2: GitHits Helper Demo
+
+Phase 2 is launched with `safebox-2`. The original `safebox` command remains the Phase 1 demo and keeps the same deny-by-default behavior.
+
+Phase 2 adds GitHits-only network access through gated helpers. It still does not provide a shell helper or general HTTP access.
+
+Prerequisites:
+
+- Node.js 20+
+- GitHits initialized and authenticated:
+  ```bash
+  npx githits@latest init
+  ```
+- Local Ollama running with `gemma4:e4b`
+
+Run closed Phase 2 behavior:
+
+```bash
+uv run safebox-2 --config configs/phase2-deny-all.toml
+```
+
+Run GitHits-enabled Phase 2 behavior:
+
+```bash
+uv run safebox-2 --config configs/phase2-githits.toml
+```
+
+Try:
+
+```text
+Use GitHits to search for how pydantic-monty runs code. Target pypi:pydantic-monty and summarize what you find.
+Fetch https://example.com.
+Write the GitHits summary into scratch/githits-summary.md.
+```
+
+Expected behavior:
+
+- GitHits calls are visible as `[gate] ALLOW githits_search ...` or `[gate] ALLOW githits_example ...`.
+- General network attempts are visible as `[gate] DENY fetch_url ...`.
+- File writes still go through `write_file` and remain scoped to `scratch`.
+
+Show invalid non-GitHits network config failing at startup:
+
+```bash
+uv run safebox-2 --config configs/phase2-invalid-network.toml
+```
+
 ## Demo Configs
 
 The `configs/` directory contains ready-to-run policies for showing the boundary changing live.
