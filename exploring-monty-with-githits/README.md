@@ -106,6 +106,8 @@ Try:
 
 ```text
 Create a README.md file in scratch with a short hello-world demo description.
+```
+```text
 Create a README.md file in the project root.
 ```
 
