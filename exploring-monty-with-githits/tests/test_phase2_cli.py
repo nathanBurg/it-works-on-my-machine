@@ -13,6 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 def test_phase2_prompt_mentions_githits_helpers():
     assert "githits_search" in PHASE2_SYSTEM_PROMPT
     assert "githits_example" in PHASE2_SYSTEM_PROMPT
+    assert "githits_screen" in PHASE2_SYSTEM_PROMPT
     assert "fetch_url" in PHASE2_SYSTEM_PROMPT
     assert "code string" in PHASE2_SYSTEM_PROMPT
     assert "Never put literal line breaks inside quoted strings" in PHASE2_SYSTEM_PROMPT

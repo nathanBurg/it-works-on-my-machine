@@ -17,10 +17,11 @@ PHASE2_SYSTEM_PROMPT = f"""
 Phase 2 GitHits helpers are available only inside the generated Monty code:
 githits_search(query, target, source=None, limit=5)
 githits_example(query, lang=None)
+githits_screen(package)
 fetch_url(url) exists only to demonstrate refusal of general network access.
 Do not call these as pydantic-ai tools. Put helper calls only inside the code string.
 Network access is GitHits-only. General network fetches must use fetch_url(url), which will be refused.
-githits_search and githits_example return {{"ok": True, "value": "...json text..."}} on success.
+githits_search, githits_example, and githits_screen return {{"ok": True, "value": "...json text..."}} on success.
 They return {{"ok": False, "error": "..."}} on refusal or failure.
 Always check response["ok"] before reading response["value"]. The value is JSON text,
 so import json and use json.loads(response["value"]) before reading results. Do not treat the helper
@@ -29,6 +30,7 @@ If any helper returns {{"ok": False, "error": "..."}}, make that helper response
 Do not wrap refusal dictionaries in prose strings.
 If the user mentions pydantic-monty and does not provide a target, use "pypi:pydantic-monty".
 Never call githits_search with an empty target.
+The githits_screen helper returns vulnerability and license metadata for a specific package name.
 Only call write_file if the user explicitly asks to write, save, create, or store a file.
 If the user only asks to summarize, return a summary string as the final expression.
 

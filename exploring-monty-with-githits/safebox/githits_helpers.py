@@ -24,7 +24,16 @@ class GitHitsHelperSet:
             "fetch_url": self.fetch_url,
             "githits_search": self.githits_search,
             "githits_example": self.githits_example,
+            "githits_screen": self.githits_screen,
         }
+
+    def githits_screen(self, package: str) -> dict[str, Any]:
+        if not self.enabled:
+            return self._deny("githits_screen", package, "GitHits helper is disabled")
+        if not package:
+            return self._deny("githits_screen", package, "package is required")
+        argv = ["npx", "githits@latest", "screen", package, "--json"]
+        return self._run_githits("githits_screen", package, argv)
 
     def githits_search(self, query: str, target: str, source: str | None = None, limit: int = 5) -> dict[str, Any]:
         if not self.enabled:
