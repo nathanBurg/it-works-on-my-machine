@@ -18,7 +18,7 @@ def test_disabled_githits_helpers_are_still_registered():
 
     functions = helpers.external_functions()
 
-    assert set(functions) == {"fetch_url", "githits_search", "githits_example"}
+    assert set(functions) == {"fetch_url", "githits_search", "githits_example", "githits_screen"}
 
 
 def test_fetch_url_always_denies():
@@ -86,6 +86,22 @@ def test_githits_example_builds_expected_argv(monkeypatch):
 
     assert result["ok"] is True
     assert calls[0] == ["npx", "githits@latest", "example", "sandbox python", "--json", "--lang", "python"]
+
+
+def test_githits_screen_builds_expected_argv(monkeypatch):
+    calls = []
+
+    def fake_run(argv, **_kwargs):
+        calls.append(argv)
+        return SimpleNamespace(returncode=0, stdout='{"risk": "low"}', stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    helpers = GitHitsHelperSet(enabled=True)
+
+    result = helpers.githits_screen("react")
+
+    assert result["ok"] is True
+    assert calls[0] == ["npx", "githits@latest", "screen", "react", "--json"]
 
 
 def test_githits_search_validates_source_and_limit():
