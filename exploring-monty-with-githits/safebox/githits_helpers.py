@@ -24,6 +24,8 @@ class GitHitsHelperSet:
             "fetch_url": self.fetch_url,
             "githits_search": self.githits_search,
             "githits_example": self.githits_example,
+            "githits_package": self.githits_package,
+            "githits_code": self.githits_code,
         }
 
     def githits_search(self, query: str, target: str, source: str | None = None, limit: int = 5) -> dict[str, Any]:
@@ -48,6 +50,24 @@ class GitHitsHelperSet:
         if lang:
             argv.extend(["--lang", lang])
         return self._run_githits("githits_example", query, argv)
+
+    def githits_package(self, spec: str) -> dict[str, Any]:
+        if not self.enabled:
+            return self._deny("githits_package", spec, "GitHits helper is disabled")
+        if not spec:
+            return self._deny("githits_package", spec, "spec is required")
+        argv = ["npx", "githits@latest", "pkg", "info", spec, "--json"]
+        return self._run_githits("githits_package", spec, argv)
+
+    def githits_code(self, spec: str, path: str) -> dict[str, Any]:
+        if not self.enabled:
+            return self._deny("githits_code", spec, "GitHits helper is disabled")
+        if not spec:
+            return self._deny("githits_code", spec, "spec is required")
+        if not path:
+            return self._deny("githits_code", spec, "path is required")
+        argv = ["npx", "githits@latest", "code", "read", spec, path, "--json"]
+        return self._run_githits("githits_code", spec, argv)
 
     def fetch_url(self, url: str) -> dict[str, Any]:
         reason = "general network access is disabled; only GitHits helpers are available"

@@ -28,8 +28,10 @@ The code runs inside pydantic-monty, so keep it simple: no classes, no context m
 no generators, and no match statements. Use ordinary functions, conditionals, loops,
 lists, dicts, strings, numbers, json, re, datetime, sys, os, and typing when needed.
 Host access is only available inside the Python code you write for Monty through these
-external functions: read_file(path), write_file(path, content), list_files(path), and
-get_env(name). These are not pydantic-ai tools. Do not try to call them directly as
+external functions: read_file(path), write_file(path, content), list_files(path),
+get_env(name), githits_search(query, target, source=None, limit=5),
+githits_example(query, lang=None), githits_package(spec), and githits_code(spec, path).
+These are not pydantic-ai tools. Do not try to call them directly as
 agent tools. You must return only the structured AgentCode output requested by the host.
 Put helper calls only inside the code string. Return code that calls them inside Monty.
 When calling any helper, always make the helper result the final expression.
@@ -125,7 +127,7 @@ class SafeboxAgent:
                 retry_prompt = (
                     "You tried to call a tool directly. Do not call tools. Return structured AgentCode only. "
                     "The code field must contain Python code that calls write_file, read_file, list_files, "
-                    "or get_env inside Monty. "
+                    "get_env, githits_search, githits_example, githits_package, or githits_code inside Monty. "
                     f"Original request: {prompt}"
                 )
                 try:
@@ -151,7 +153,8 @@ def _retry_prompt(user_message: str, failed_code: str, error: str | None) -> str
         "or escaped \"\\\\n\" sequences. "
         "Preserve the requested path exactly. If the user asked for a file in scratch, use \"scratch/<filename>\". "
         "For file create/write/read/list or environment requests, call the matching host helper: "
-        "write_file, read_file, list_files, or get_env. Do not just construct a value without calling a helper. "
+        "write_file, read_file, list_files, or get_env. If using GitHits tools, call githits_search, "
+        "githits_example, githits_package, or githits_code. Do not just construct a value without calling a helper. "
         "Stay inside Monty's supported subset.\n"
         f"Original request:\n{user_message}"
     )
@@ -162,8 +165,8 @@ def _missing_required_helper_error(user_message: str, execution: ExecutionResult
         return None
     lowered = user_message.lower()
     has_host_term = bool(
-        re.search(r"\b(?:file|files|scratch|env|environment|directory|directories|folder|folders)\b", lowered)
-        or re.search(r"\b(?:write_file|read_file|list_files|get_env)\b", lowered)
+        re.search(r"\b(?:file|files|scratch|env|environment|directory|directories|folder|folders|githits|search|example|package|code)\b", lowered)
+        or re.search(r"\b(?:write_file|read_file|list_files|get_env|githits_search|githits_example|githits_package|githits_code)\b", lowered)
     )
     has_path_like_term = bool(
         re.search(r"\b[\w.-]+\.(?:md|txt|json|toml|py)\b", lowered)
