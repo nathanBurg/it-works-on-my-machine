@@ -88,6 +88,12 @@ class HelpersConfig(BaseModel):
         return self
 
 
+class SecurityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    blacklisted_licenses: list[str] = Field(default_factory=list)
+    block_high_vulnerabilities: bool = True
+
 class SafeboxConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -96,6 +102,7 @@ class SafeboxConfig(BaseModel):
     env: EnvConfig = Field(default_factory=EnvConfig)
     network: NetworkConfig = Field(default_factory=NetworkConfig)
     helpers: HelpersConfig = Field(default_factory=HelpersConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
     source_path: Path | None = None
     used_defaults: bool = False
 

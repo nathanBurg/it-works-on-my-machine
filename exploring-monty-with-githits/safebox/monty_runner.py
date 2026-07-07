@@ -7,7 +7,7 @@ import pydantic_monty
 
 from .config import SafeboxConfig
 from .gates import AuditRecord, GateSet
-
+from .screening import PreflightScreening
 
 @dataclass(frozen=True)
 class ExecutionResult:
@@ -33,6 +33,22 @@ class MontyRunner:
 
         def collect(stream: str, text: str) -> None:
             streams.append((stream, text))
+            
+        screening = PreflightScreening(self.config)
+        screening_result = screening.screen_code(code)
+        
+        # Combine screening audit with any existing audit records
+        self.extra_audit_sources.append(screening)
+        
+        if not screening_result["ok"]:
+            return ExecutionResult(
+                ok=False,
+                output=None,
+                stdout="",
+                stderr="",
+                error=screening_result["error"],
+                audit=self._audit(gates),
+            )
 
         try:
             monty = pydantic_monty.Monty(code)

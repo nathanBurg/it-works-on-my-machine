@@ -10,6 +10,7 @@ from .approval import ApprovalGate
 from .config import SafeboxConfig
 from .gates import AuditRecord, GateSet
 from .monty_runner import ExecutionResult
+from .screening import PreflightScreening
 from .snapshots import SnapshotMetadata, SnapshotStore, policy_fingerprint
 
 
@@ -36,24 +37,30 @@ class Phase3Runner:
         def collect(stream: str, text: str) -> None:
             streams.append((stream, text))
 
+        screening = PreflightScreening(self.config)
+        screening_result = screening.screen_code(code)
+        
+        if not screening_result["ok"]:
+            return SnapshotRunResult(_execution(False, None, streams, screening_result["error"], _audit(gates, approval, screening)))
+
         try:
             progress = pydantic_monty.Monty(code).start(print_callback=collect)
             progress = self._dispatch_until_pause_or_complete(progress, gates, approval)
         except pydantic_monty.MontyError as exc:
-            return SnapshotRunResult(_execution(False, None, streams, str(exc), _audit(gates, approval)))
+            return SnapshotRunResult(_execution(False, None, streams, str(exc), _audit(gates, approval, screening)))
         except Exception as exc:
-            return SnapshotRunResult(_execution(False, None, streams, f"Host execution error: {exc}", _audit(gates, approval)))
+            return SnapshotRunResult(_execution(False, None, streams, f"Host execution error: {exc}", _audit(gates, approval, screening)))
 
         if _is_complete(progress):
-            return SnapshotRunResult(_execution(True, progress.output, streams, None, _audit(gates, approval)))
+            return SnapshotRunResult(_execution(True, progress.output, streams, None, _audit(gates, approval, screening)))
         if _function_name(progress) != "request_approval":
             return SnapshotRunResult(
-                _execution(False, None, streams, f"Unsupported pending helper: {_function_name(progress)}", _audit(gates, approval))
+                _execution(False, None, streams, f"Unsupported pending helper: {_function_name(progress)}", _audit(gates, approval, screening))
             )
 
         reason = str(progress.args[0]) if progress.args else "approval requested"
         approval.request_approval(reason)
-        audit = _audit(gates, approval)
+        audit = _audit(gates, approval, screening)
         metadata = self.store.save(
             snapshot_bytes=progress.dump(),
             config=self.config,
@@ -149,8 +156,11 @@ def _policy_mismatch_error(metadata: SnapshotMetadata, active_config: SafeboxCon
     return None
 
 
-def _audit(gates: GateSet, approval: ApprovalGate) -> list[AuditRecord]:
-    return list(approval.audit) + list(gates.audit)
+def _audit(gates: GateSet, approval: ApprovalGate, screening: PreflightScreening | None = None) -> list[AuditRecord]:
+    audit_records = list(approval.audit) + list(gates.audit)
+    if screening is not None:
+        audit_records.extend(screening.audit)
+    return audit_records
 
 
 def _execution(ok: bool, output: Any, streams: list[tuple[str, str]], error: str | None, audit: list[AuditRecord]) -> ExecutionResult:

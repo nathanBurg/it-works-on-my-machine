@@ -127,11 +127,13 @@ def render_completion_from_audit(audit) -> str | None:
 
 
 def render_execution_failure(result) -> str:
-    return (
-        f"Execution failed after {result.attempts} attempts: {result.execution.error}\n"
-        "Generated code:\n"
-        f"```python\n{result.code}\n```"
-    )
+    parts = [f"Execution failed after {result.attempts} attempts: {result.execution.error}"]
+    if result.execution.audit:
+        parts.append("Audit log:")
+        for record in result.execution.audit:
+            parts.append(record.render())
+    parts.append("Generated code:\n" + f"```python\n{result.code}\n```")
+    return "\n".join(parts)
 
 
 def render_stdout(stdout: str, *, output: Any) -> str | None:
