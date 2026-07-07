@@ -172,7 +172,7 @@ def test_execution_failure_renders_attempt_count_and_code():
     result = SimpleNamespace(
         attempts=3,
         code='write_file("scratch/README.md", "# Demo',
-        execution=SimpleNamespace(error="missing closing quote in string literal"),
+        execution=SimpleNamespace(error="missing closing quote in string literal", audit=[]),
     )
 
     rendered = render_execution_failure(result)
