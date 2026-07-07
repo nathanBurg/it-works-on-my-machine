@@ -83,6 +83,24 @@ class SafeboxAgent:
             generated = self._generate_code(prompt)
             last_code = generated.code
             last_explanation = generated.explanation
+            self.log_step("Running security audit on generated code")
+            from .audit import run_security_audit
+            audit_result = run_security_audit(generated.code)
+            if not audit_result["ok"]:
+                self.log_step("Security audit failed; code execution blocked")
+                last_execution = ExecutionResult(
+                    ok=False,
+                    output=None,
+                    stdout="",
+                    stderr="",
+                    error=audit_result["error"],
+                    audit=[],
+                )
+                if attempt == total_attempts:
+                    break
+                self.log_step(f"Generated code failed audit; asking model to rewrite (attempt {attempt + 1}/{total_attempts})")
+                prompt = _retry_prompt(user_message, generated.code, last_execution.error)
+                continue
             self.log_step("Running generated code in Monty")
             last_execution = self.runner.run(generated.code)
             if last_execution.ok:
